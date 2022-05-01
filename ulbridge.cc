@@ -2,6 +2,7 @@
 #define _CRT_SECURE_NO_WARNINGS 1
 
 #include <Ultralight/Ultralight.h>
+#include <AppCore/Platform.h>
 #include <unordered_map>
 #include <iostream>
 #include <thread>
@@ -34,6 +35,8 @@
 using namespace ultralight;
 
 RefPtr<Renderer> renderer;
+typedef void (*CommandCallback)(const char*, const char*);
+static CommandCallback commandCallback = nullptr;
 
 std::string toUTF8(String16 const& s)
 {
@@ -43,241 +46,6 @@ std::string toUTF8(String16 const& s)
     res[i] = s.udata()[i];
   return res;
 }
-class LocalFileSystem: public FileSystem
-{
-private:
-  std::string base = "./";
-
-public:
-  void SetBase(std::string b)
-  {
-    base = b;
-  }
-  std::filesystem::path toPath(String16 const& sfx)
-  {
-    auto res = std::filesystem::path(base) / toUTF8(sfx);
-    std::cerr << "got path " << res << std::endl;
-    return res;
-  }
-  virtual bool FileExists(const String16& path)
-  {
-    return std::filesystem::exists(toPath(path));
-  }
-
-  ///
-  /// Delete file, return true on success.
-  ///
-  virtual bool DeleteFile_(const String16& path) { return false; }
-
-  ///
-  /// Delete empty directory, return true on success.
-  ///
-  virtual bool DeleteEmptyDirectory(const String16& path) { return false;}
-
-  ///
-  /// Move file, return true on success.
-  ///
-  virtual bool MoveFile_(const String16& old_path, const String16& new_path) { return false;}
-
-  ///
-  /// Get file size, store result in 'result'. Return true on success.
-  ///
-  virtual bool GetFileSize(const String16& path, int64_t& result)
-  { 
-    result = std::filesystem::file_size(toPath(path));
-    return true;
-  }
-
-  ///
-  /// Get file size of previously opened file, store result in 'result'. Return true on success.
-  ///
-  virtual bool GetFileSize(FileHandle handle, int64_t& result)
-  {
-    struct stat st;
-    fstat(handle, &st);
-    result = st.st_size;
-    return true;
-  }
-  
-
-  ///
-  /// Get file mime type (eg "text/html"), store result in 'result'. Return true on success.
-  ///
-  virtual bool GetFileMimeType(const String16& path, String16& result)
-  { // lol what?
-    auto ext = toPath(path).extension();
-    if (ext == ".htm" || ext == ".html")
-      result = String16("text/html");
-    if (ext == ".js")
-      result = String16("text/javascript");
-    if (ext == ".png")
-      result = String16("image/png");
-    if (ext == ".jpg")
-      result = String16("image/jpeg");
-    return true;
-  }
-
-  ///
-  /// Get file last modification time, store result in 'result'. Return true on success.
-  ///
-  virtual bool GetFileModificationTime(const String16& path, time_t& result) { return false;}
-
-  ///
-  /// Get file creation time, store result in 'result'. Return true on success.
-  ///
-  virtual bool GetFileCreationTime(const String16& path, time_t& result) { return false;}
-
-  ///
-  /// Get path type (file or directory).
-  ///
-  virtual MetadataType GetMetadataType(const String16& path)
-  {
-    return kMetadataType_File;
-  }
-
-  ///
-  /// Concatenate path with another path component. Return concatenated result.
-  ///
-  virtual String16 GetPathByAppendingComponent(const String16& path, const String16& component)
-  {
-    String16 res(path);
-    res += String16("/");
-    res += component;
-    return res;
-  }
-
-  ///
-  /// Create directory, return true on success.
-  ///
-  virtual bool CreateDirectory_(const String16& path) { return false;}
-
-  ///
-  /// Get home directory path.
-  ///
-  virtual String16 GetHomeDirectory()
-  {
-    return String16("/");
-  }
-
-  ///
-  /// Get filename component from path.
-  ///
-  virtual String16 GetFilenameFromPath(const String16& path)
-  {
-    return toPath(path).filename().string().c_str();
-  }
-
-  ///
-  /// Get directory name from path.
-  ///
-  virtual String16 GetDirectoryNameFromPath(const String16& path)
-  {
-    return String16(std::filesystem::path(toUTF8(path)).parent_path().string().c_str());
-  }
-
-  ///
-  /// Get volume from path and store free space in 'result'. Return true on success.
-  ///
-  virtual bool GetVolumeFreeSpace(const String16& path, uint64_t& result) { return false;}
-
-  ///
-  /// Get volume from path and return its unique volume id.
-  ///
-  virtual int32_t GetVolumeId(const String16& path) { return 0;}
-
-  ///
-  /// Get file listing for directory path with optional filter, return vector of file paths.
-  ///
-  virtual Ref<String16Vector> ListDirectory(const String16& path, const String16& filter)
-  {
-    return String16Vector::Create();
-  }
-
-  ///
-  /// Open a temporary file with suggested prefix, store handle in 'handle'. Return path of temporary file.
-  ///
-  virtual String16 OpenTemporaryFile(const String16& prefix, FileHandle& handle)
-  {
-    return String16();
-  }
-
-  ///
-  /// Open file path for reading or writing. Return file handle on success, or invalidFileHandle on failure.
-  ///
-  virtual FileHandle OpenFile(const String16& path, bool open_for_writing)
-  {
-#ifdef _MSC_VER
-          return _open(toPath(path).string().c_str(), _O_RDONLY);
-#else
-          return open(toPath(path).string().c_str(), O_RDONLY);
-#endif
-  }
-
-  ///
-  /// Close previously-opened file.
-  ///
-  virtual void CloseFile(FileHandle& handle)
-  {
-#ifdef _MSC_VER
-      _close(handle);
-#else
-      close(handle);
-#endif
-  }
-
-  ///
-  /// Seek currently-opened file, with offset relative to certain origin. Return new file offset.
-  ///
-  virtual int64_t SeekFile(FileHandle handle, int64_t offset, FileSeekOrigin origin)
-  {
-    int whence = 0;
-    switch (origin)
-    {
-    case kFileSeekOrigin_Beginning:
-      whence = SEEK_SET; break;
-    case kFileSeekOrigin_Current:
-      whence = SEEK_CUR; break;
-    case kFileSeekOrigin_End:
-      whence = SEEK_END; break;
-    }
-#ifdef _MSC_VER
-    return _lseek(handle, offset, whence);
-#else
-    return lseek(handle, offset, whence);
-#endif
-  }
-
-  ///
-  /// Truncate currently-opened file with offset, return true on success.
-  ///
-  virtual bool TruncateFile(FileHandle handle, int64_t offset)
-  {
-    return false;
-  }
-
-  ///
-  /// Write to currently-opened file, return number of bytes written or -1 on failure.
-  ///
-  virtual int64_t WriteToFile(FileHandle handle, const char* data, int64_t length) { return -1;}
-
-  ///
-  /// Read from currently-opened file, return number of bytes read or -1 on failure.
-  ///
-  virtual int64_t ReadFromFile(FileHandle handle, char* data, int64_t length)
-  {
-#ifdef _MSC_VER
-      return _read(handle, data, length);
-#else
-    return read(handle, data, length);
-#endif
-  }
-
-  ///
-  /// Copy file from source to destination, return true on success.
-  ///
-  virtual bool CopyFile_(const String16& source_path, const String16& destination_path) { return false;}
-
-};
 
 class BridgeListener;
 
@@ -319,8 +87,13 @@ JSValueRef native_call(JSContextRef ctx, JSObjectRef function,
   auto jArg = JSValueToStringCopy(ctx, arguments[1], exception);
   std::string name = toUTF8(jName);
   std::string args = toUTF8(jArg);
-  std::lock_guard g(commandsLock);
-  commands.emplace_back(name, args);
+  if (commandCallback != nullptr)
+    commandCallback(name.c_str(), args.c_str());
+  else
+  {
+    std::lock_guard g(commandsLock);
+    commands.emplace_back(name, args);
+  }
   return JSValueMakeNull(ctx);
 }
 
@@ -332,11 +105,11 @@ public:
   {
     view->set_load_listener(this);
   }
-  virtual void OnDOMReady(View* view) override;
+  virtual void OnDOMReady(View* view, uint64_t frame_id, bool is_main_frame, const String& url) override;
   std::string name;
 };
 
-void BridgeListener::OnDOMReady(View* view) {
+void BridgeListener::OnDOMReady(View* view, uint64_t frame_id, bool is_main_frame, const String& url) {
   std::lock_guard lg(viewsLock);
   auto& v = views[name];
   v.domReady = true;
@@ -344,7 +117,8 @@ void BridgeListener::OnDOMReady(View* view) {
     view->EvaluateScript(String(js.c_str()));
   v.pendingJS.clear();
   // install native call handler
-  JSContextRef ctx = view->js_context();
+  auto wctx = view->LockJSContext();
+  auto ctx = wctx->ctx();
   JSStringRef name = JSStringCreateWithUTF8CString("nativeCall");
     JSObjectRef func = JSObjectMakeFunctionWithCallback(ctx, name, native_call);
     JSObjectRef globalObj = JSContextGetGlobalObject(ctx);
@@ -355,18 +129,23 @@ void BridgeListener::OnDOMReady(View* view) {
 
 
 static bool initialized = false;
-extern "C" ULBAPI void ulbridge_init() {
+extern "C" ULBAPI void ulbridge_init(bool gpu) {
   std::cerr << "***ULBRIDGE INIT " << initialized << std::endl;
   if (initialized)
     return;
   initialized = true;
   // Do any custom config here
   Config config;
+  config.resource_path = "./resources/";
+  config.use_gpu_renderer = gpu;
+  config.device_scale = 1.0;
   //config.force_repaint = true;
   Platform::instance().set_config(config);
   //Platform::instance().set_gpu_driver(my_gpu_driver);
-  Platform::instance().set_file_system(new LocalFileSystem());
-  
+  //Platform::instance().set_file_system(new LocalFileSystem());
+  Platform::instance().set_font_loader(GetPlatformFontLoader());
+  Platform::instance().set_file_system(GetPlatformFileSystem("."));
+  Platform::instance().set_logger(GetDefaultLogger("ultralight.log"));
   // Create the library
   renderer = Renderer::Create();
 }
@@ -457,7 +236,7 @@ extern "C" ULBAPI void ulbridge_update()
 
 extern "C" ULBAPI void ulbridge_view_create(const char* name, int w, int h)
 {
-  RefPtr<View> view = renderer->CreateView(w, h, true);
+  RefPtr<View> view = renderer->CreateView(w, h, true, nullptr);
   views[name] = ViewData{ view, nullptr};
   views[name].listener = std::make_unique<BridgeListener>(name, view.get());
 }
@@ -466,18 +245,29 @@ extern "C" ULBAPI bool ulbridge_view_is_dirty(const char* name)
 {
   auto it = views.find(name);
   if (it == views.end())
+  {
+    commandCallback("log", "View does not exist");
     return false;
+  }
   else
-    return it->second.view->is_bitmap_dirty();
+  {
+    BitmapSurface* surface = (BitmapSurface*)(it->second.view->surface());
+    return !surface->dirty_bounds().IsEmpty();
+  }
 }
-extern "C" ULBAPI void* ulbridge_view_get_pixels(const char* name)
+extern "C" ULBAPI void* ulbridge_view_get_pixels(const char* name, int* w, int* h, int* stride)
 {
   auto it = views.find(name);
   if (it == views.end())
     return nullptr;
   auto& vd = it->second;
-  auto bitmap = vd.view->bitmap();
+  Surface* surface = vd.view->surface();
+  BitmapSurface* bitmap_surface = (BitmapSurface*)surface;
+  RefPtr<Bitmap> bitmap = bitmap_surface->bitmap();
   vd.bitmap = bitmap;
+  *w = bitmap->width();
+  *h = bitmap->height();
+  *stride = bitmap->row_bytes();
   void* pixels = vd.bitmap->LockPixels();
   return pixels;
 }
@@ -500,8 +290,10 @@ extern "C" ULBAPI int ulbridge_view_stride(const char* name)
 extern "C" ULBAPI void ulbridge_view_unlock_pixels(const char* name)
 {
   auto& vd = views[name];
+  BitmapSurface* surface = (BitmapSurface*)(vd.view->surface());
   vd.bitmap->UnlockPixels();
   vd.bitmap = nullptr;
+  surface->ClearDirtyBounds();
 }
 
 extern "C" ULBAPI void ulbridge_view_load_html(const char* name, const char* html)
@@ -629,7 +421,6 @@ extern "C" ULBAPI void ulbridge_shutdown() {
 }
 
 typedef void (*Callback)();
-typedef void (*CommandCallback)(const char*, const char*);
 static std::thread thread;
 static bool stopThread = false;
 static bool threadRunning = false;
@@ -641,6 +432,11 @@ extern "C" ULBAPI void ulbridge_set_callback(Callback cb)
 {
   std::cerr << "***SETCB " << cb << std::endl;
   callback = cb;
+}
+extern "C" ULBAPI void ulbridge_set_command_callback(CommandCallback cb)
+{
+  std::cerr << "***SETCCB " << cb << std::endl;
+  commandCallback = cb;
 }
 extern "C" ULBAPI void ulbridge_send_commands(CommandCallback cb)
 {
@@ -654,7 +450,7 @@ extern "C" ULBAPI void ulbridge_send_commands(CommandCallback cb)
 }
 static void ulbridge_loop()
 {
-  ulbridge_init();
+  ulbridge_init(false);
   while (!stopThread)
   {
     ULDEBUG("renderer...");
@@ -667,9 +463,12 @@ static void ulbridge_loop()
     ULDEBUG("views..." << views.size());
     for (auto& v: views)
     {
-      if (v.second.view->is_bitmap_dirty())
+      BitmapSurface* surface = (BitmapSurface*)(v.second.view->surface());
+      if (!surface->dirty_bounds().IsEmpty())
       {
-        auto bitmap = v.second.view->bitmap();
+        Surface* surface = v.second.view->surface();
+        BitmapSurface* bitmap_surface = (BitmapSurface*)surface;
+        RefPtr<Bitmap> bitmap = bitmap_surface->bitmap();
         v.second.dirty = true;
         v.second.w = bitmap->width();
         v.second.h = bitmap->height();

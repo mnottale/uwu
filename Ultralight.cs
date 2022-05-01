@@ -12,7 +12,9 @@ public class ULBridge
     public delegate void Callback();
     public delegate void JSNativeCall([MarshalAs(UnmanagedType.LPStr)]string name, [MarshalAs(UnmanagedType.LPStr)]string value);
     [DllImport("ulbridge.so", CallingConvention = CallingConvention.Cdecl)]
-    public static extern void ulbridge_init();
+    public static extern void ulbridge_init(bool gpu);
+    [DllImport("ulbridge.so", CallingConvention = CallingConvention.Cdecl)]
+    public static extern void ulbridge_set_command_callback(JSNativeCall cb);
     [DllImport("ulbridge.so", CallingConvention = CallingConvention.Cdecl)]
     public static extern void ulbridge_shutdown();
     [DllImport("ulbridge.so", CallingConvention = CallingConvention.Cdecl)]
@@ -24,17 +26,26 @@ public class ULBridge
     [DllImport("ulbridge.so", CallingConvention = CallingConvention.Cdecl)]
     public static extern void ulbridge_update();
     [DllImport("ulbridge.so", CallingConvention = CallingConvention.Cdecl)]
+    public static extern void ulbridge_view_mouse_event ([MarshalAs(UnmanagedType.LPStr)] string name, int x, int y, int type, int button);
+    [DllImport("ulbridge.so", CallingConvention = CallingConvention.Cdecl)]
+    public static extern void ulbridge_view_scroll_event ([MarshalAs(UnmanagedType.LPStr)] string name, int x, int y, int type);
+    [DllImport("ulbridge.so", CallingConvention = CallingConvention.Cdecl)]
+    public static extern void ulbridge_view_key_event    ([MarshalAs(UnmanagedType.LPStr)] string name, int type, int vcode, int mods);
+
+    [DllImport("ulbridge.so", CallingConvention = CallingConvention.Cdecl)]
     public static extern void ulbridge_view_create       ([MarshalAs(UnmanagedType.LPStr)] string name, int w, int h);
     [DllImport("ulbridge.so", CallingConvention = CallingConvention.Cdecl)]
     public static extern bool ulbridge_view_is_dirty     ([MarshalAs(UnmanagedType.LPStr)] string name);
     [DllImport("ulbridge.so", CallingConvention = CallingConvention.Cdecl)]
-    public static extern IntPtr ulbridge_view_get_pixels ([MarshalAs(UnmanagedType.LPStr)] string name);
+    public static extern IntPtr ulbridge_view_get_pixels ([MarshalAs(UnmanagedType.LPStr)] string name, out int w, out int h, out int stride);
     [DllImport("ulbridge.so", CallingConvention = CallingConvention.Cdecl)]
     public static extern void ulbridge_view_unlock_pixels([MarshalAs(UnmanagedType.LPStr)] string name);
     [DllImport("ulbridge.so", CallingConvention = CallingConvention.Cdecl)]
     public static extern void ulbridge_view_load_html    ([MarshalAs(UnmanagedType.LPStr)] string name, [MarshalAs(UnmanagedType.LPStr)] string html);
     [DllImport("ulbridge.so", CallingConvention = CallingConvention.Cdecl)]
     public static extern void ulbridge_view_load_url     ([MarshalAs(UnmanagedType.LPStr)] string name, [MarshalAs(UnmanagedType.LPStr)] string url);
+    [DllImport("ulbridge.so", CallingConvention = CallingConvention.Cdecl)]
+    public static extern void ulbridge_view_eval_script  ([MarshalAs(UnmanagedType.LPStr)] string name, [MarshalAs(UnmanagedType.LPStr)] string script);
     [DllImport("ulbridge.so", CallingConvention = CallingConvention.Cdecl)]
     public static extern void ulbridge_view_resize       ([MarshalAs(UnmanagedType.LPStr)] string name, int w, int h);
     [DllImport("ulbridge.so", CallingConvention = CallingConvention.Cdecl)]
@@ -69,108 +80,16 @@ public class ULBridge
     public static extern void ulbridge_async_view_key_event    ([MarshalAs(UnmanagedType.LPStr)] string name, int type, int vcode, int mods);
 }
 
-public class UltralightManager
+public class ViewData
 {
-    public delegate void JavascriptCallback(string payload);
-    public class ViewData
-    {
-        public int viewWidth;
-        public int viewHeight;
-        public int w;
-        public int h;
-        public Color32[] data;
-        public bool changed;
-    }
-    static private UltralightManager instance;
-    private Dictionary<string, ViewData> views = new Dictionary<string, ViewData>();
-    private Dictionary<string, JavascriptCallback> callbacks = new Dictionary<string, JavascriptCallback>();
-    private int lastUpdateFrame;
-    static public UltralightManager Instance()
-    {
-        if (instance == null)
-            instance = new UltralightManager();
-        return instance;
-    }
-    public void Detach()
-    {
-    }
-    private bool mustStop = false;
-    private UltralightManager()
-    {
-        Debug.Log("****INIT()");
-        //ULBridge.ulbridge_set_callback(callback);
-        ULBridge.ulbridge_start_thread();
-        RegisterCallback("log",  val => Debug.Log("JS: " + val));
-    }
-    public void RegisterCallback(string name, JavascriptCallback callback)
-    {
-        callbacks.Add(name, callback);
-    }
-    public void ProcessCallback(string name, string value)
-    {
-        JavascriptCallback cb;
-        if (callbacks.TryGetValue(name, out cb))
-            cb(value);
-        else
-            Debug.Log("Received JS message to unknown target: " + name);
-    }
-    public void Update()
-    {
-        if (Time.frameCount == lastUpdateFrame)
-            return;
-        lastUpdateFrame = Time.frameCount;
-        ULBridge.ulbridge_send_commands(this.ProcessCallback);
-    }
-
-    public void CreateView(string name, int w, int h)
-    {
-        ViewData v;
-        if (views.TryGetValue(name, out v))
-            throw new Exception("View already exists");
-        ULBridge.ulbridge_async_view_create(name, w, h);
-        //ULBridge.ulbridge_async_view_load_html(name, "<body> <h1>loading...</h1></body>");
-        views.Add(name, new ViewData()
-            {
-                viewWidth = w,
-                viewHeight = h,
-                data = new Color32[w*h],
-            });
-    }
-    public ViewData GetView(string name)
-    {
-        ViewData res = null;
-        if (!views.TryGetValue(name, out res))
-            return null;
-        if (!ULBridge.ulbridge_async_view_is_dirty(name))
-        {
-            res.changed = false;
-            return res;
-        }
-        // The texture can have a different size than the one requested,
-        // but it will be black(unfilled) outside our requested size.
-        int nw;
-        int nh;
-        int stride;
-        var pixels = ULBridge.ulbridge_async_view_get_pixels(name, out nw, out nh, out stride);
-        unsafe {
-            if (pixels.ToPointer() == null)
-                return null;
-        }
-        res.w = res.viewWidth;
-        res.h = res.viewHeight;
-        unsafe {
-            var scolors = (Color32*)pixels.ToPointer();
-            for (int y=0; y<res.viewHeight; ++y)
-            {
-                var start = scolors + y*stride/4;
-                for (int x=0; x<res.viewWidth; ++x)
-                    res.data[x+(res.viewHeight-y-1)*res.viewWidth] = start[x];
-            }
-        }
-        res.changed = true;
-        return res;
-    }
+    public int viewWidth;
+    public int viewHeight;
+    public int w;
+    public int h;
+    public Color32[] data;
+    public bool changed;
 }
+
 
 
 public enum Anchor
@@ -194,6 +113,7 @@ public class Ultralight: MonoBehaviour
     public string javascript = "";
     public bool execJavascriptNow = false;
     bool created = false;
+    int nForce = 0;
     Texture2D tex;
     int x;
     int y;
@@ -205,40 +125,76 @@ public class Ultralight: MonoBehaviour
     }
     public void LoadURL(string url)
     {
-        ULBridge.ulbridge_async_view_load_url(gameObject.name, url);
+        ULBridge.ulbridge_view_load_url(gameObject.name, url);
     }
     public void ExecJavascript(string js)
     {
         if (created)
-            ULBridge.ulbridge_async_view_eval_script(gameObject.name, js);
+            ULBridge.ulbridge_view_eval_script(gameObject.name, js);
         else
         {
             javascript = js;
             execJavascriptNow = true;
         }
     }
+    private ViewData GetView(bool force=false)
+    {
+        ViewData res = new ViewData {};
+        var rawDirty = ULBridge.ulbridge_view_is_dirty(gameObject.name);
+        if (!force && !rawDirty)
+        {
+            res.changed = false;
+            return res;
+        }
+        // The texture can have a different size than the one requested,
+        // but it will be black(unfilled) outside our requested size.
+        int nw;
+        int nh;
+        int stride;
+        var pixels = ULBridge.ulbridge_view_get_pixels(gameObject.name, out nw, out nh, out stride);
+        unsafe {
+            if (pixels.ToPointer() == null)
+                return null;
+        }
+        res.w = width;
+        res.h = height;
+        res.viewWidth = width;
+        res.viewHeight = height;
+        res.data = new Color32[res.w*res.h];
+        unsafe {
+            var scolors = (Color32*)pixels.ToPointer();
+            for (int y=0; y<res.viewHeight; ++y)
+            {
+                var start = scolors + y*stride/4;
+                for (int x=0; x<res.viewWidth; ++x)
+                    res.data[x+(res.viewHeight-y-1)*res.viewWidth] = start[x];
+            }
+        }
+        ULBridge.ulbridge_view_unlock_pixels(gameObject.name);
+        res.changed = true;
+        return res;
+    }
     void Update()
     {
-        UltralightManager.Instance().Update();
         if (!created)
         {
             created = true;
-            UltralightManager.Instance().CreateView(gameObject.name, width, height);
-            ULBridge.ulbridge_async_view_load_url(gameObject.name, url);
+            ULBridge.ulbridge_view_create(gameObject.name, width, height);
+            ULBridge.ulbridge_view_load_url(gameObject.name, url);
         }
         if (loadUrlNow)
         {
             loadUrlNow = false;
-            ULBridge.ulbridge_async_view_load_url(gameObject.name, url);
+            ULBridge.ulbridge_view_load_url(gameObject.name, url);
         }
         if (execJavascriptNow)
         {
             execJavascriptNow = false;
-            ULBridge.ulbridge_async_view_eval_script(gameObject.name, javascript);
+            ULBridge.ulbridge_view_eval_script(gameObject.name, javascript);
         }
         if (!isGui)
         {
-            var vd = UltralightManager.Instance().GetView(gameObject.name);
+            var vd = GetView();
             if (vd != null && vd.data != null && vd.changed)
             {
                 vd.changed = false;
@@ -264,20 +220,20 @@ public class Ultralight: MonoBehaviour
                     if (Input.GetMouseButtonDown(b))
                     {
                         Debug.Log("button down");
-                        ULBridge.ulbridge_async_view_mouse_event(gameObject.name, (int)mp.x-x, (int)mp.y-y, 1, b+1);
+                        ULBridge.ulbridge_view_mouse_event(gameObject.name, (int)mp.x-x, (int)mp.y-y, 1, b+1);
                         emited = true;
                     }
                     if (Input.GetMouseButtonUp(b))
                     {
                         Debug.Log("button up");
                         emited = true;
-                        ULBridge.ulbridge_async_view_mouse_event(gameObject.name, (int)mp.x-x, (int)mp.y-y, 2, b+1);
+                        ULBridge.ulbridge_view_mouse_event(gameObject.name, (int)mp.x-x, (int)mp.y-y, 2, b+1);
                     }
                 }
                 if (!emited)
-                    ULBridge.ulbridge_async_view_mouse_event(gameObject.name, (int)mp.x - x, (int)mp.y-y, 0, 0);
+                    ULBridge.ulbridge_view_mouse_event(gameObject.name, (int)mp.x - x, (int)mp.y-y, 0, 0);
                 if (Input.mouseScrollDelta.y != 0)
-                    ULBridge.ulbridge_async_view_scroll_event(gameObject.name, 0, (int)Input.mouseScrollDelta.y, 1);
+                    ULBridge.ulbridge_view_scroll_event(gameObject.name, 0, (int)Input.mouseScrollDelta.y, 1);
             }
         }
     }
@@ -391,16 +347,23 @@ public class Ultralight: MonoBehaviour
     {
         if (!isGui || !created)
             return;
-        var vd = UltralightManager.Instance().GetView(gameObject.name);
+        var vd = GetView(tex == null);
         if (vd == null || vd.data == null || !vd.changed)
-            return;
-
-        vd.changed = false;
-        if (tex == null || tex.width != vd.w || tex.height != vd.h)
-            tex = new Texture2D(vd.w, vd.h);
-        tex.SetPixels32(vd.data);
-        tex.Apply();
-
+        {
+            if (tex == null)
+                return;
+        }
+        else
+        {
+            vd.changed = false;
+            if (tex == null || tex.width != vd.w || tex.height != vd.h)
+            {
+                Debug.Log($"Creating texture {vd.w} {vd.h}");
+                tex = new Texture2D(vd.w, vd.h);
+            }
+            tex.SetPixels32(vd.data);
+            tex.Apply();
+        }
         x = 0;
         y = 0;
         if (anchorX == Anchor.AnchorCenter)
@@ -435,7 +398,7 @@ public class Ultralight: MonoBehaviour
                         mods |= (1 << 1);
                     if (ev.command)
                         mods |= (1 << 2);
-                    ULBridge.ulbridge_async_view_key_event(gameObject.name,
+                    ULBridge.ulbridge_view_key_event(gameObject.name,
                         ev.type == EventType.KeyDown ? 1 : 0,
                         vcode, mods);
                 }
