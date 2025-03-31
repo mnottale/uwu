@@ -11,72 +11,72 @@ public class ULBridge
 {
     public delegate void Callback();
     public delegate void JSNativeCall([MarshalAs(UnmanagedType.LPStr)]string name, [MarshalAs(UnmanagedType.LPStr)]string value);
-    [DllImport("ulbridge.so", CallingConvention = CallingConvention.Cdecl)]
+    [DllImport("ulbridge", CallingConvention = CallingConvention.Cdecl)]
     public static extern void ulbridge_init(bool gpu);
-    [DllImport("ulbridge.so", CallingConvention = CallingConvention.Cdecl)]
+    [DllImport("ulbridge", CallingConvention = CallingConvention.Cdecl)]
     public static extern void ulbridge_set_command_callback(JSNativeCall cb);
-    [DllImport("ulbridge.so", CallingConvention = CallingConvention.Cdecl)]
+    [DllImport("ulbridge", CallingConvention = CallingConvention.Cdecl)]
     public static extern void ulbridge_shutdown();
-    [DllImport("ulbridge.so", CallingConvention = CallingConvention.Cdecl)]
+    [DllImport("ulbridge", CallingConvention = CallingConvention.Cdecl)]
     public static extern void ulbridge_start_thread();
-    [DllImport("ulbridge.so", CallingConvention = CallingConvention.Cdecl)]
+    [DllImport("ulbridge", CallingConvention = CallingConvention.Cdecl)]
     public static extern void ulbridge_set_callback(Callback cb);
-    [DllImport("ulbridge.so", CallingConvention = CallingConvention.Cdecl)]
+    [DllImport("ulbridge", CallingConvention = CallingConvention.Cdecl)]
     public static extern void ulbridge_render();
-    [DllImport("ulbridge.so", CallingConvention = CallingConvention.Cdecl)]
+    [DllImport("ulbridge", CallingConvention = CallingConvention.Cdecl)]
     public static extern void ulbridge_update();
-    [DllImport("ulbridge.so", CallingConvention = CallingConvention.Cdecl)]
+    [DllImport("ulbridge", CallingConvention = CallingConvention.Cdecl)]
     public static extern void ulbridge_view_mouse_event ([MarshalAs(UnmanagedType.LPStr)] string name, int x, int y, int type, int button);
-    [DllImport("ulbridge.so", CallingConvention = CallingConvention.Cdecl)]
+    [DllImport("ulbridge", CallingConvention = CallingConvention.Cdecl)]
     public static extern void ulbridge_view_scroll_event ([MarshalAs(UnmanagedType.LPStr)] string name, int x, int y, int type);
-    [DllImport("ulbridge.so", CallingConvention = CallingConvention.Cdecl)]
+    [DllImport("ulbridge", CallingConvention = CallingConvention.Cdecl)]
     public static extern void ulbridge_view_key_event    ([MarshalAs(UnmanagedType.LPStr)] string name, int type, int vcode, int mods);
 
-    [DllImport("ulbridge.so", CallingConvention = CallingConvention.Cdecl)]
+    [DllImport("ulbridge", CallingConvention = CallingConvention.Cdecl)]
     public static extern void ulbridge_view_create       ([MarshalAs(UnmanagedType.LPStr)] string name, int w, int h);
-    [DllImport("ulbridge.so", CallingConvention = CallingConvention.Cdecl)]
+    [DllImport("ulbridge", CallingConvention = CallingConvention.Cdecl)]
     public static extern bool ulbridge_view_is_dirty     ([MarshalAs(UnmanagedType.LPStr)] string name);
-    [DllImport("ulbridge.so", CallingConvention = CallingConvention.Cdecl)]
+    [DllImport("ulbridge", CallingConvention = CallingConvention.Cdecl)]
     public static extern IntPtr ulbridge_view_get_pixels ([MarshalAs(UnmanagedType.LPStr)] string name, out int w, out int h, out int stride);
-    [DllImport("ulbridge.so", CallingConvention = CallingConvention.Cdecl)]
+    [DllImport("ulbridge", CallingConvention = CallingConvention.Cdecl)]
     public static extern void ulbridge_view_unlock_pixels([MarshalAs(UnmanagedType.LPStr)] string name);
-    [DllImport("ulbridge.so", CallingConvention = CallingConvention.Cdecl)]
+    [DllImport("ulbridge", CallingConvention = CallingConvention.Cdecl)]
     public static extern void ulbridge_view_load_html    ([MarshalAs(UnmanagedType.LPStr)] string name, [MarshalAs(UnmanagedType.LPStr)] string html);
-    [DllImport("ulbridge.so", CallingConvention = CallingConvention.Cdecl)]
+    [DllImport("ulbridge", CallingConvention = CallingConvention.Cdecl)]
     public static extern void ulbridge_view_load_url     ([MarshalAs(UnmanagedType.LPStr)] string name, [MarshalAs(UnmanagedType.LPStr)] string url);
-    [DllImport("ulbridge.so", CallingConvention = CallingConvention.Cdecl)]
+    [DllImport("ulbridge", CallingConvention = CallingConvention.Cdecl)]
     public static extern void ulbridge_view_eval_script  ([MarshalAs(UnmanagedType.LPStr)] string name, [MarshalAs(UnmanagedType.LPStr)] string script);
-    [DllImport("ulbridge.so", CallingConvention = CallingConvention.Cdecl)]
+    [DllImport("ulbridge", CallingConvention = CallingConvention.Cdecl)]
     public static extern void ulbridge_view_resize       ([MarshalAs(UnmanagedType.LPStr)] string name, int w, int h);
-    [DllImport("ulbridge.so", CallingConvention = CallingConvention.Cdecl)]
+    [DllImport("ulbridge", CallingConvention = CallingConvention.Cdecl)]
     public static extern int ulbridge_view_width         ([MarshalAs(UnmanagedType.LPStr)] string name);
-    [DllImport("ulbridge.so", CallingConvention = CallingConvention.Cdecl)]
+    [DllImport("ulbridge", CallingConvention = CallingConvention.Cdecl)]
     public static extern int ulbridge_view_height        ([MarshalAs(UnmanagedType.LPStr)] string name);
-    [DllImport("ulbridge.so", CallingConvention = CallingConvention.Cdecl)]
+    [DllImport("ulbridge", CallingConvention = CallingConvention.Cdecl)]
     public static extern int ulbridge_view_stride        ([MarshalAs(UnmanagedType.LPStr)] string name);
-    [DllImport("ulbridge.so", CallingConvention = CallingConvention.Cdecl)]
+    [DllImport("ulbridge", CallingConvention = CallingConvention.Cdecl)]
     public static extern void ulbridge_async_view_create ([MarshalAs(UnmanagedType.LPStr)] string name, int w, int h);
-    [DllImport("ulbridge.so", CallingConvention = CallingConvention.Cdecl)]
+    [DllImport("ulbridge", CallingConvention = CallingConvention.Cdecl)]
     public static extern void ulbridge_async_view_resize ([MarshalAs(UnmanagedType.LPStr)] string name, int w, int h);
-    [DllImport("ulbridge.so", CallingConvention = CallingConvention.Cdecl)]
+    [DllImport("ulbridge", CallingConvention = CallingConvention.Cdecl)]
     public static extern void ulbridge_async_view_load_html([MarshalAs(UnmanagedType.LPStr)] string name, [MarshalAs(UnmanagedType.LPStr)] string html);
-    [DllImport("ulbridge.so", CallingConvention = CallingConvention.Cdecl)]
+    [DllImport("ulbridge", CallingConvention = CallingConvention.Cdecl)]
     public static extern void ulbridge_async_view_load_url ([MarshalAs(UnmanagedType.LPStr)] string name, [MarshalAs(UnmanagedType.LPStr)] string url);
-    [DllImport("ulbridge.so", CallingConvention = CallingConvention.Cdecl)]
+    [DllImport("ulbridge", CallingConvention = CallingConvention.Cdecl)]
     public static extern bool ulbridge_async_view_is_dirty ([MarshalAs(UnmanagedType.LPStr)] string name);
-    [DllImport("ulbridge.so", CallingConvention = CallingConvention.Cdecl)]
+    [DllImport("ulbridge", CallingConvention = CallingConvention.Cdecl)]
     public static extern IntPtr ulbridge_async_view_get_pixels ([MarshalAs(UnmanagedType.LPStr)] string name, out int w, out int h, out int stride);
-    [DllImport("ulbridge.so", CallingConvention = CallingConvention.Cdecl)]
+    [DllImport("ulbridge", CallingConvention = CallingConvention.Cdecl)]
     public static extern void ulbridge_async_delete_all_views();
-    [DllImport("ulbridge.so", CallingConvention = CallingConvention.Cdecl)]
+    [DllImport("ulbridge", CallingConvention = CallingConvention.Cdecl)]
     public static extern void ulbridge_async_view_mouse_event ([MarshalAs(UnmanagedType.LPStr)] string name, int x, int y, int type, int button);
-    [DllImport("ulbridge.so", CallingConvention = CallingConvention.Cdecl)]
+    [DllImport("ulbridge", CallingConvention = CallingConvention.Cdecl)]
     public static extern void ulbridge_async_view_scroll_event ([MarshalAs(UnmanagedType.LPStr)] string name, int x, int y, int type);
-    [DllImport("ulbridge.so", CallingConvention = CallingConvention.Cdecl)]
+    [DllImport("ulbridge", CallingConvention = CallingConvention.Cdecl)]
     public static extern void ulbridge_send_commands(JSNativeCall cb);
-    [DllImport("ulbridge.so", CallingConvention = CallingConvention.Cdecl)]
+    [DllImport("ulbridge", CallingConvention = CallingConvention.Cdecl)]
     public static extern void ulbridge_async_view_eval_script  ([MarshalAs(UnmanagedType.LPStr)] string name, [MarshalAs(UnmanagedType.LPStr)] string script);
-    [DllImport("ulbridge.so", CallingConvention = CallingConvention.Cdecl)]
+    [DllImport("ulbridge", CallingConvention = CallingConvention.Cdecl)]
     public static extern void ulbridge_async_view_key_event    ([MarshalAs(UnmanagedType.LPStr)] string name, int type, int vcode, int mods);
 }
 

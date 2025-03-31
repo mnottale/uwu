@@ -11,13 +11,23 @@ executing javascript in the loaded page, and calling C# functions from javascrip
 Download ultralight SDK 1.2.1 from their download page for your platform.
 Then download the UwU native component from the releases tab, or build your own dll/so.
 
-Note that the UwU native component *must* be called `ulbridge.so`
-on all platforms.
+Building on linux (assuming ultralight SDK in ./uldsk:
+
+```sh
+g++ -fPIC -shared -o  libulbridge.so -Iulsdk/include ulbridge.cc -Lulsdk/bin -lUltralightCore -lUltralight -lWebCore -lAppCore '-Wl,-rpath,$ORIGIN'
+```
+
+Copy libulbridge.so (ulbridge.dll on windows) into Assets/Plugins directory (creating it if needed). Copy also all .so/.dll from ultralight sdk "bin" directory.
+
 
 Finally copy the Ultralight.cs and UltralightManager.cs files in your
 Assets/scripts directory.
 
 # Using
+
+Enable unsafe code in your unity project: go to project settings -> player -> allow unsafe code (all the way down).
+
+Enable preloading for ulbridge.dll/libulbridge.so by clicking on the file in the asset browser, and ticking the "preload" button.
 
 Instantiate UltralightManager once on any GameObject. This singleton is responsible
 for calling ultralight render and update, as well as dispatching JS callbacks.
